@@ -24,7 +24,7 @@ ZLIB_VERSION="zlib-1.2.11"
 CURL_VERSION="curl-7.71.0"
 ICONV_VERSION="libiconv-1.16"
 XML2_VERSION="libxml2-2.9.10"
-SDL2_VERSION="SDL2-2.0.18"
+SDL2_VERSION="SDL2-2.26.5"
 # NOTE: remember to also update LIB_URL below when changing version
 BOOST_VERSION="boost_1_76_0"
 # NOTE: remember to also update LIB_URL below when changing version

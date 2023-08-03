@@ -67,6 +67,7 @@
 #include <wchar.h>
 
 #elif defined(__APPLE__)
+#include <cmath>
 #include <ctype.h>
 #include <wctype.h>
 #include <unistd.h>
