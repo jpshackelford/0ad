@@ -29,12 +29,14 @@ ifeq ($(origin AR), default)
 endif
 INCLUDES += -I../../contrib/libzip/include
 FORCE_INCLUDE +=
-ALL_CPPFLAGS += $(CPPFLAGS) -MMD -MP $(DEFINES) $(INCLUDES)
+SUPPRESS_ERRORS = -Wno-error=implicit-function-declaration
+ALL_CPPFLAGS += $(CPPFLAGS) $(SUPPRESS_ERRORS) -MMD -MP $(DEFINES) $(INCLUDES)
 ALL_RESFLAGS += $(RESFLAGS) $(DEFINES) $(INCLUDES)
 LIBS +=
 LDDEPS +=
 ALL_LDFLAGS += $(LDFLAGS)
 LINKCMD = $(AR) -rcs "$@" $(OBJECTS)
+
 define PREBUILDCMDS
 endef
 define PRELINKCMDS
