@@ -50,6 +50,8 @@
 #include "simulation2/serialization/StdDeserializer.h"
 #include "simulation2/serialization/StdSerializer.h"
 
+class CCmpAIManager;
+
 extern void QuitEngine();
 
 /**
@@ -766,6 +768,8 @@ public:
 		m_HierarchicalPathfinder.Recompute(&m_PassabilityMap, m_NonPathfindingPassClasses, m_PathfindingPassClasses);
 	}
 
+	void AdaptToNewSettings(const JS::PersistentRootedValue& attribs, CCmpAIManager& component);
+
 	int getPlayerSize()
 	{
 		return m_Players.size();
@@ -918,6 +922,12 @@ public:
 		m_Worker.Deserialize(deserialize.GetStream(), numAis);
 
 		m_JustDeserialized = true;
+	}
+
+	void AdaptToNewSettings(const JS::PersistentRootedValue& attribs) override
+	{
+		// TODO: remove first argument
+		m_Worker.AdaptToNewSettings(attribs, *this);
 	}
 
 	void AddPlayer(const std::wstring& id, player_id_t player, u8 difficulty, const std::wstring& behavior) override
@@ -1116,5 +1126,88 @@ private:
 
 	CAIWorker m_Worker;
 };
+
+void CAIWorker::AdaptToNewSettings(const JS::PersistentRootedValue& attribs, CCmpAIManager& component)
+{
+	ScriptRequest rq{component.GetSimContext().GetScriptInterface()};
+
+	ENSURE(attribs.isObject());
+	JS::RootedObject attribsAsObject{rq.cx};
+	ENSURE(JS_ValueToObject(rq.cx, attribs, &attribsAsObject));
+
+	JS::RootedValue settings{rq.cx};
+	ENSURE(JS_GetProperty(rq.cx, attribsAsObject, "settings", &settings));
+
+	ENSURE(settings.isObject());
+	JS::RootedObject settingsAsObject{rq.cx};
+	ENSURE(JS_ValueToObject(rq.cx, settings, &settingsAsObject));
+
+	JS::RootedValue allPlayerData{rq.cx};
+	ENSURE(JS_GetProperty(rq.cx, settingsAsObject, "PlayerData", &allPlayerData));
+
+	// An array is also an object.
+	ENSURE(allPlayerData.isObject());
+	JS::RootedObject allPlayerDataAsObject{rq.cx};
+	ENSURE(JS_ValueToObject(rq.cx, allPlayerData, &allPlayerDataAsObject));
+
+	JS::RootedValue playerLength{rq.cx};
+	ENSURE(JS_GetProperty(rq.cx, allPlayerDataAsObject, "length", &playerLength));
+	player_id_t playerCount;
+	ENSURE(Script::FromJSVal(rq, playerLength, playerCount));
+
+	// Player 0 is null. Start at 1.
+	for (player_id_t i{1}; i != playerCount; ++i)
+	{
+		JS::RootedValue playerData{rq.cx};
+		ENSURE(JS_GetProperty(rq.cx, allPlayerDataAsObject, std::to_string(i).c_str(), &playerData));
+
+		ENSURE(playerData.isObject());
+		JS::RootedObject playerDataAsObject{rq.cx};
+		ENSURE(JS_ValueToObject(rq.cx, playerData, &playerDataAsObject));
+
+		JS::RootedValue ai{rq.cx};
+		ENSURE(JS_GetProperty(rq.cx, playerDataAsObject, "AI", &ai));
+
+		const auto found = std::find_if(m_Players.begin(), m_Players.end(), [i](auto& player)
+		{
+			return player->m_Player == i;
+		});
+
+		if (ai.isString())
+		{
+			if (found == m_Players.end())
+			{
+				// Acording to the attributes there should be a AI but it isn't found. Add it.
+				JS::RootedValue difficulty{rq.cx};
+				ENSURE(JS_GetProperty(rq.cx, playerDataAsObject, "AIDiff", &difficulty));
+				ENSURE(difficulty.isInt32());
+
+				JS::RootedValue behavior{rq.cx};
+				ENSURE(JS_GetProperty(rq.cx, playerDataAsObject, "AIBehavior", &behavior));
+				ENSURE(behavior.isString());
+
+				// Not the player name.
+				std::wstring aiName;
+				ENSURE(Script::FromJSVal(rq, ai, aiName));
+
+				u8 difficultyNumber;
+				ENSURE(Script::FromJSVal(rq, difficulty, difficultyNumber));
+
+				std::wstring behaviorString;
+				ENSURE(Script::FromJSVal(rq, behavior, behaviorString));
+
+				// TODO: Why does this line result in a crash while serializing?
+				// component.AddPlayer(aiName, i, difficultyNumber, behaviorString);
+			}
+		}
+		else
+		{
+			ENSURE(ai.isFalse());
+			if (found != m_Players.end())
+				// Acording to the attributes there shouldn't be a AI but one is found. Erase it.
+				m_Players.erase(found);
+		}
+	}
+}
 
 REGISTER_COMPONENT_TYPE(AIManager)

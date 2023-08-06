@@ -238,6 +238,8 @@ public:
 
 	void SendStartGameMessage(const CStr& initAttribs);
 
+	void SendStartSavedGameMessage(const CStr& initAttribs, const CStr& savedState);
+
 	/**
 	 * Call when the client has rejoined a running match and finished
 	 * the loading screen.
@@ -279,6 +281,7 @@ private:
 	static bool OnPlayerAssignment(void* context, CFsmEvent* event);
 	static bool OnInGame(void* context, CFsmEvent* event);
 	static bool OnGameStart(void* context, CFsmEvent* event);
+	static bool OnSavedGameStart(void* context, CFsmEvent* event);
 	static bool OnJoinSyncStart(void* context, CFsmEvent* event);
 	static bool OnJoinSyncEndCommandBatch(void* context, CFsmEvent* event);
 	static bool OnRejoined(void* context, CFsmEvent* event);
@@ -293,6 +296,12 @@ private:
 	 * Take ownership of a session object, and use it for all network communication.
 	 */
 	void SetAndOwnSession(CNetClientSession* session);
+
+	/**
+	 * Starts a game with the specified init attributes and saved state. Called
+	 * by the start game and start saved game callbacks.
+	 */
+	static void StartGame(void* context, const std::string& initAttributes, const std::string& savedState);
 
 	/**
 	 * Push a message onto the GUI queue listing the current player assignments.

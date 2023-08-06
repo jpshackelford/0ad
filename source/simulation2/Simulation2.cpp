@@ -893,7 +893,7 @@ bool CSimulation2::SerializeState(std::ostream& stream)
 bool CSimulation2::DeserializeState(std::istream& stream)
 {
 	// TODO: need to make sure the required SYSTEM_ENTITY components get constructed
-	return m->m_ComponentManager.DeserializeState(stream);
+	return m->m_ComponentManager.DeserializeState(stream, &m->m_InitAttributes);
 }
 
 void CSimulation2::ActivateRejoinTest(int turn)

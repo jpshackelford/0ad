@@ -117,6 +117,7 @@ CNetClient::CNetClient(CGame* game) :
 	AddTransition(NCS_PREGAME, (uint)NMT_CLIENT_TIMEOUT, NCS_PREGAME, &OnClientTimeout, context);
 	AddTransition(NCS_PREGAME, (uint)NMT_CLIENT_PERFORMANCE, NCS_PREGAME, &OnClientPerformance, context);
 	AddTransition(NCS_PREGAME, (uint)NMT_GAME_START, NCS_LOADING, &OnGameStart, context);
+	AddTransition(NCS_PREGAME, (uint)NMT_SAVED_GAME_START, NCS_LOADING, &OnSavedGameStart, context);	
 	AddTransition(NCS_PREGAME, (uint)NMT_JOIN_SYNC_START, NCS_JOIN_SYNCING, &OnJoinSyncStart, context);
 
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_CHAT, NCS_JOIN_SYNCING, &OnChat, context);
@@ -126,6 +127,7 @@ CNetClient::CNetClient(CGame* game) :
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_CLIENT_TIMEOUT, NCS_JOIN_SYNCING, &OnClientTimeout, context);
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_CLIENT_PERFORMANCE, NCS_JOIN_SYNCING, &OnClientPerformance, context);
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_GAME_START, NCS_JOIN_SYNCING, &OnGameStart, context);
+	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_SAVED_GAME_START, NCS_LOADING, &OnSavedGameStart, context);
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_SIMULATION_COMMAND, NCS_JOIN_SYNCING, &OnInGame, context);
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_END_COMMAND_BATCH, NCS_JOIN_SYNCING, &OnJoinSyncEndCommandBatch, context);
 	AddTransition(NCS_JOIN_SYNCING, (uint)NMT_LOADED_GAME, NCS_INGAME, &OnLoadedGame, context);
@@ -522,6 +524,18 @@ void CNetClient::SendStartGameMessage(const CStr& initAttribs)
 	SendMessage(&gameStart);
 }
 
+void CNetClient::SendStartSavedGameMessage(const CStr& initAttribs, const CStr& savedState)
+{
+	CGameSavedStartMessage gameSavedStart;
+	gameSavedStart.m_InitAttributes = initAttribs;
+
+	std::string compressed;
+	CompressZLib(savedState, compressed, true);
+
+	gameSavedStart.m_SavedState = compressed;
+	SendMessage(&gameSavedStart);
+}
+
 void CNetClient::SendRejoinedMessage()
 {
 	CRejoinedMessage rejoinedMessage;
@@ -633,6 +647,30 @@ void CNetClient::SendAuthenticateMessage()
 	authenticate.m_Password = m_Password;
 	authenticate.m_ControllerSecret = m_ControllerSecret;
 	SendMessage(&authenticate);
+}
+
+void CNetClient::StartGame(void* context, const std::string& initAttributes, const std::string& savedState)
+{
+	CNetClient* client = static_cast<CNetClient*>(context);
+
+	// Find the player assigned to our GUID
+	int player = -1;
+	if (client->m_PlayerAssignments.find(client->m_GUID) != client->m_PlayerAssignments.end())
+		player = client->m_PlayerAssignments[client->m_GUID].m_PlayerID;
+
+	client->m_ClientTurnManager = new CNetClientTurnManager(
+			*client->m_Game->GetSimulation2(), *client, client->m_HostID, client->m_Game->GetReplayLogger());
+
+	// Parse init attributes.
+	const ScriptInterface& scriptInterface = client->m_Game->GetSimulation2()->GetScriptInterface();
+	ScriptRequest rq(scriptInterface);
+	JS::RootedValue initAttribs(rq.cx);
+	Script::ParseJSON(rq, initAttributes, &initAttribs);
+
+	client->m_Game->SetPlayerID(player);
+	client->m_Game->StartGame(&initAttribs, savedState);
+
+	client->PushGuiMessage("type", "start", "initAttributes", initAttribs);
 }
 
 bool CNetClient::OnConnect(void* context, CFsmEvent* event)
@@ -796,31 +834,21 @@ bool CNetClient::OnPlayerAssignment(void* context, CFsmEvent* event)
 // if this client rejoins and finishes the download of the simstate.
 bool CNetClient::OnGameStart(void* context, CFsmEvent* event)
 {
-	ENSURE(event->GetType() == (uint)NMT_GAME_START);
-
-	CNetClient* client = static_cast<CNetClient*>(context);
+	ENSURE(event->GetType() == static_cast<uint>(NMT_GAME_START));
 	CGameStartMessage* message = static_cast<CGameStartMessage*>(event->GetParamRef());
 
-	// Find the player assigned to our GUID
-	int player = -1;
-	if (client->m_PlayerAssignments.find(client->m_GUID) != client->m_PlayerAssignments.end())
-		player = client->m_PlayerAssignments[client->m_GUID].m_PlayerID;
+	StartGame(context, message->m_InitAttributes, "");
+	return true;
+}
 
-	client->m_ClientTurnManager = new CNetClientTurnManager(
-			*client->m_Game->GetSimulation2(), *client, client->m_HostID, client->m_Game->GetReplayLogger());
+bool CNetClient::OnSavedGameStart(void* context, CFsmEvent* event)
+{
+	ENSURE(event->GetType() == static_cast<uint>(NMT_SAVED_GAME_START));
+	std::string state;
+	CGameSavedStartMessage* message = static_cast<CGameSavedStartMessage*>(event->GetParamRef());
 
-	// Parse init attributes.
-	const ScriptInterface& scriptInterface = client->m_Game->GetSimulation2()->GetScriptInterface();
-	ScriptRequest rq(scriptInterface);
-	JS::RootedValue initAttribs(rq.cx);
-	Script::ParseJSON(rq, message->m_InitAttributes, &initAttribs);
-
-	client->m_Game->SetPlayerID(player);
-	client->m_Game->StartGame(&initAttribs, "");
-
-	client->PushGuiMessage("type", "start",
-						   "initAttributes", initAttribs);
-
+	DecompressZLib(message->m_SavedState, state, true);
+	StartGame(context, message->m_InitAttributes, state);
 	return true;
 }
 

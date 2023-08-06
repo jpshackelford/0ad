@@ -28,6 +28,7 @@
 #include "simulation2/serialization/StdSerializer.h"
 #include "simulation2/serialization/StdDeserializer.h"
 
+#include "simulation2/components/ICmpAIManager.h"
 #include "simulation2/components/ICmpTemplateManager.h"
 
 #include "ps/CLogger.h"
@@ -294,7 +295,8 @@ bool CComponentManager::SerializeState(std::ostream& stream) const
 	return true;
 }
 
-bool CComponentManager::DeserializeState(std::istream& stream)
+bool CComponentManager::DeserializeState(std::istream& stream,
+	const JS::PersistentRootedValue* const attribs /*= nullptr*/)
 {
 	try
 	{
@@ -337,6 +339,8 @@ bool CComponentManager::DeserializeState(std::istream& stream)
 			// deserializing any further non-system entities
 			if (ctid == CID_TemplateManager)
 				templateManager = static_cast<ICmpTemplateManager*> (component);
+			else if (attribs && ctid == CID_AIManager)
+				static_cast<ICmpAIManager*>(component)->AdaptToNewSettings(*attribs);
 		}
 
 		uint32_t numComponentTypes;

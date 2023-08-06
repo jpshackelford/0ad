@@ -47,6 +47,8 @@ public:
 	 */
 	virtual void PushCommands() = 0;
 
+	virtual void AdaptToNewSettings(const JS::PersistentRootedValue& attribs) = 0;
+
 	/**
 	 * Returns a vector of {"id":"value-for-AddPlayer", "name":"Human readable name"}
 	 * objects, based on all the available AI scripts.

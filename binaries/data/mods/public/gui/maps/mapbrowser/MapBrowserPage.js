@@ -10,7 +10,7 @@ function init()
 {
 	let cache = new MapCache();
 	let filters = new MapFilters(cache);
-	let browser = new MapBrowser(cache, filters);
+	const browser = new MapBrowser(cache, filters, g_SetupWindow);
 	browser.registerClosePageHandler(() => Engine.PopGuiPage());
 	browser.openPage();
 	browser.controls.MapFiltering.select("default", "skirmish");

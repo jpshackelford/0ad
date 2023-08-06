@@ -45,14 +45,20 @@ u8* CNetMessage::Serialize(u8* pBuffer) const
 {
 	size_t size = GetSerializedLength();
 	Serialize_int_1(pBuffer, m_Type);
-	Serialize_int_2(pBuffer, size);
+
+	if (m_Type == NMT_SAVED_GAME_START)
+		Serialize_int_3(pBuffer, size);
+	else
+		Serialize_int_2(pBuffer, size);
 
 	return pBuffer;
 }
 
 const u8* CNetMessage::Deserialize(const u8* pStart, const u8* pEnd)
 {
-	if (pStart + 3 > pEnd)
+	const int header_size = m_Type == NMT_SAVED_GAME_START ? 4 : 3;
+
+	if (pStart + header_size > pEnd)
 	{
 		LOGERROR("CNetMessage: Corrupt packet (smaller than header)");
 		return NULL;
@@ -63,13 +69,18 @@ const u8* CNetMessage::Deserialize(const u8* pStart, const u8* pEnd)
 	int type;
 	size_t size;
 	Deserialize_int_1(pBuffer, type);
-	Deserialize_int_2(pBuffer, size);
+
 	m_Type = (NetMessageType)type;
+
+	if (m_Type == NMT_SAVED_GAME_START)
+		Deserialize_int_3(pBuffer, size);
+	else
+		Deserialize_int_2(pBuffer, size);
 
 	if (pStart + size != pEnd)
 	{
 		LOGERROR("CNetMessage: Corrupt packet (incorrect size)");
-		return NULL;
+		return nullptr;
 	}
 
 	return pBuffer;
@@ -77,8 +88,9 @@ const u8* CNetMessage::Deserialize(const u8* pStart, const u8* pEnd)
 
 size_t CNetMessage::GetSerializedLength() const
 {
-	// By default, return header size
-	return 3;
+	// By default, return header size. In case the type of the message is
+	// NMT_SAVED_GAME_START, the size of its header will be 4
+	return m_Type == NMT_SAVED_GAME_START ? 4 : 3;
 }
 
 CStr CNetMessage::ToString() const
@@ -181,6 +193,10 @@ CNetMessage* CNetMessageFactory::CreateMessage(const void* pData,
 
 	case NMT_GAME_START:
 		pNewMessage = new CGameStartMessage;
+		break;
+
+	case NMT_SAVED_GAME_START:
+		pNewMessage = new CGameSavedStartMessage;
 		break;
 
 	case NMT_END_COMMAND_BATCH:

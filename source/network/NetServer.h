@@ -257,9 +257,20 @@ private:
 	void AssignPlayer(int playerID, const CStr& guid);
 
 	/**
+	 * Switch in game mode. The clients will have to be notified to start the
+	 * game. This method is called by StartGame and StartSavedGame
+	 */
+	void PreStartGame(const CStr& initAttribs);
+
+	/**
 	 * Switch in game mode and notify all clients to start the game.
 	 */
 	void StartGame(const CStr& initAttribs);
+
+	/**
+	 * Switch in game mode and notify all clients to start the saved game.
+	 */
+	void StartSavedGame(const CStr& initAttribs, const CStr& savedData);
 
 	/**
 	 * Make a player name 'nicer' by limiting the length and removing forbidden characters etc.
@@ -306,6 +317,7 @@ private:
 	static bool OnGameSetup(void* context, CFsmEvent* event);
 	static bool OnAssignPlayer(void* context, CFsmEvent* event);
 	static bool OnGameStart(void* context, CFsmEvent* event);
+	static bool OnSavedGameStart(void* context, CFsmEvent* event);
 	static bool OnLoadedGame(void* context, CFsmEvent* event);
 	static bool OnJoinSyncingLoadedGame(void* context, CFsmEvent* event);
 	static bool OnRejoined(void* context, CFsmEvent* event);

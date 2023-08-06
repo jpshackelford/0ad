@@ -265,7 +265,7 @@ public:
 	// FlushDestroyedComponents must be called before SerializeState (since the destruction queue
 	// won't get serialized)
 	bool SerializeState(std::ostream& stream) const;
-	bool DeserializeState(std::istream& stream);
+	bool DeserializeState(std::istream& stream, const JS::PersistentRootedValue* const attribs = nullptr);
 
 	std::string GenerateSchema() const;
 
